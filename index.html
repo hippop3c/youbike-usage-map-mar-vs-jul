@@ -25,8 +25,9 @@
  .ctrl button{flex:1;font-size:11px;padding:5px 4px;border:1px solid #c3ccda;background:#f4f6f9;border-radius:6px;cursor:pointer;color:#28405f}
  .ctrl button:hover{background:#e6ebf2}
  .citygrp{margin-bottom:8px}
- .cityhd{font-size:12px;font-weight:700;color:#fff;background:#5b7bb0;padding:4px 8px;border-radius:5px;display:flex;justify-content:space-between;cursor:pointer}
+ .cityhd{font-size:12px;font-weight:700;color:#fff;background:#5b7bb0;padding:4px 8px;border-radius:5px;display:flex;justify-content:space-between;align-items:center;cursor:pointer}
  .cityhd.nt{background:#8a6d3b}
+ .cityhd input{margin:0 6px 0 0;accent-color:#fff;vertical-align:-1px}
  label.row{display:flex;align-items:center;gap:6px;padding:4px 6px;font-size:12.5px;border-radius:5px;cursor:pointer}
  label.row:hover{background:#f0f3f8}
  label.row input{cursor:pointer}
@@ -75,8 +76,8 @@
   </div>
   <div id="charts">
    <div class="chartbox">
-     <h4>配車數 <span>（各區平均車輛：3月 → 上週）</span></h4>
-     <div class="leg"><span><i style="background:#c9b28a"></i>3月</span><span><i style="background:#8a6d3b"></i>上週</span></div>
+     <h4>配車數 <span>（各區平均車輛：3月 → 7月）</span></h4>
+     <div class="leg"><span><i style="background:#c9b28a"></i>3月</span><span><i style="background:#8a6d3b"></i>7月</span></div>
      <div id="chartVeh"></div>
    </div>
    <div class="chartbox">
@@ -151,7 +152,7 @@ function renderCharts(){
   let ds=selectedDistricts();
   const v=ds.filter(d=>d.veh_m!=null).slice().sort((a,b)=>(b.veh_l-b.veh_m)-(a.veh_l-a.veh_m))
            .map(d=>({label:d.dist.replace('區',''),a:d.veh_m,b:d.veh_l}));
-  barChart('chartVeh', v, ['3月','上週'], ['#c9b28a','#8a6d3b']);
+  barChart('chartVeh', v, ['3月','7月'], ['#c9b28a','#8a6d3b']);
   const u=ds.slice().sort((a,b)=>(b.tot_j-b.tot_m)-(a.tot_j-a.tot_m))
            .map(d=>({label:d.dist.replace('區',''),a:d.tot_m,b:d.tot_j}));
   barChart('chartUse', u, ['3月','7月'], ['#9db8dd','#2E5496']);
@@ -166,7 +167,7 @@ function renderSummary(){
   const el=document.getElementById('summary');
   el.innerHTML=
    badge('選取行政區', ds.length+' 區', '共 '+n+' 個A級站')+
-   badge('配車數 3月→上週', haveV?fmt(vm)+' → '+fmt(vl):'—', haveV?arrow(vl-vm)+' '+pctTxt(vP):'')+
+   badge('配車數 3月→7月', haveV?fmt(vm)+' → '+fmt(vl):'—', haveV?arrow(vl-vm)+' '+pctTxt(vP):'')+
    badge('全區總用量 3月→7月', fmt(tm)+' → '+fmt(tj), arrow(tj-tm)+' '+pctTxt(uP))+
    badge('每車用量比 (7月)', haveV&&vl?(tj/vl).toFixed(1):'—', haveV?'3月 '+(vm?(tm/vm).toFixed(1):'—'):'');
 }
@@ -180,7 +181,7 @@ function buildSidebar(){
   let html='';
   cities.forEach(([city,cls])=>{
     const ds=DATA.districts.filter(d=>d.city===city).sort((a,b)=>(b.tot_j-b.tot_m)-(a.tot_j-a.tot_m));
-    html+='<div class="citygrp"><div class="cityhd '+cls+'" onclick="toggleCity(\''+city+'\')"><span>'+city+'（'+ds.length+'）</span><span>全選/清</span></div>';
+    html+='<div class="citygrp"><label class="cityhd '+cls+'"><span><input type="checkbox" class="city-toggle" data-city="'+city+'" checked onchange="onCityToggle(this)">'+city+'（'+ds.length+'）</span><span>整市勾選</span></label>';
     ds.forEach(d=>{
       const dv=(d.veh_m!=null)?('車'+(d.veh_l-d.veh_m>=0?'+':'')+(d.veh_l-d.veh_m)):'';
       html+='<label class="row"><input type="checkbox" data-k="'+key(d)+'" checked onchange="onToggle(this)"><span class="dn">'+d.dist+'</span><span class="dv">'+dv+'</span></label>';
@@ -189,11 +190,21 @@ function buildSidebar(){
   });
   el.innerHTML=html;
 }
-function onToggle(cb){ const k=cb.getAttribute('data-k'); if(cb.checked)state.selected.add(k); else state.selected.delete(k); renderAll(); }
-function selAll(v){ document.querySelectorAll('#dlist input').forEach(cb=>{cb.checked=v; const k=cb.getAttribute('data-k'); if(v)state.selected.add(k);else state.selected.delete(k);}); renderAll(); }
-function toggleCity(city){
-  const boxes=[...document.querySelectorAll('#dlist input')].filter(cb=>cb.getAttribute('data-k').startsWith(city+'|'));
-  const anyOff=boxes.some(cb=>!cb.checked); boxes.forEach(cb=>{cb.checked=anyOff; const k=cb.getAttribute('data-k'); if(anyOff)state.selected.add(k);else state.selected.delete(k);}); renderAll();
+function updateCityCheckboxes(){
+  document.querySelectorAll('.city-toggle').forEach(cityCb=>{
+    const city=cityCb.getAttribute('data-city');
+    const boxes=[...document.querySelectorAll('#dlist input[data-k]')].filter(cb=>cb.getAttribute('data-k').startsWith(city+'|'));
+    const checked=boxes.filter(cb=>cb.checked).length;
+    cityCb.checked=checked===boxes.length;
+    cityCb.indeterminate=checked>0&&checked<boxes.length;
+  });
+}
+function onToggle(cb){ const k=cb.getAttribute('data-k'); if(cb.checked)state.selected.add(k); else state.selected.delete(k); updateCityCheckboxes(); renderAll(); }
+function selAll(v){ document.querySelectorAll('#dlist input[data-k]').forEach(cb=>{cb.checked=v; const k=cb.getAttribute('data-k'); if(v)state.selected.add(k);else state.selected.delete(k);}); updateCityCheckboxes(); renderAll(); }
+function onCityToggle(cityCb){
+  const city=cityCb.getAttribute('data-city'), value=cityCb.checked;
+  document.querySelectorAll('#dlist input[data-k]').forEach(cb=>{ const k=cb.getAttribute('data-k'); if(k.startsWith(city+'|')){ cb.checked=value; if(value)state.selected.add(k);else state.selected.delete(k); }});
+  updateCityCheckboxes(); renderAll();
 }
 function renderAll(){ renderSummary(); renderMap(); renderCharts(); }
 
