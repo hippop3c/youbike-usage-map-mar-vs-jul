@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>A級場站地圖 — 配車數與用量 3月vs7月</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+ *{box-sizing:border-box}
+ body{margin:0;font-family:"Segoe UI","Microsoft JhengHei",Arial,sans-serif;color:#1f2733;background:#eef1f5}
+ header{background:#1F3864;color:#fff;padding:12px 18px}
+ header h1{margin:0;font-size:18px;font-weight:700}
+ header .sub{font-size:12px;opacity:.8;margin-top:2px}
+ #summary{display:flex;flex-wrap:wrap;gap:10px;padding:10px 18px;background:#25406e}
+ .badge{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.18);border-radius:8px;padding:6px 12px;color:#fff;min-width:120px}
+ .badge .lab{font-size:11px;opacity:.8}
+ .badge .val{font-size:16px;font-weight:700;margin-top:2px}
+ .badge .val small{font-size:12px;font-weight:600}
+ .up{color:#7CE0A9}.down{color:#F5A9A0}
+ .wrap{display:flex;gap:0;height:calc(100vh - 132px);min-height:520px}
+ #side{width:250px;flex:0 0 250px;background:#fff;overflow-y:auto;border-right:1px solid #dbe1ea;padding:10px}
+ #side h3{margin:6px 4px;font-size:13px;color:#25406e}
+ .ctrl{display:flex;gap:6px;flex-wrap:wrap;margin:6px 2px 10px}
+ .ctrl button{flex:1;font-size:11px;padding:5px 4px;border:1px solid #c3ccda;background:#f4f6f9;border-radius:6px;cursor:pointer;color:#28405f}
+ .ctrl button:hover{background:#e6ebf2}
+ .citygrp{margin-bottom:8px}
+ .cityhd{font-size:12px;font-weight:700;color:#fff;background:#5b7bb0;padding:4px 8px;border-radius:5px;display:flex;justify-content:space-between;cursor:pointer}
+ .cityhd.nt{background:#8a6d3b}
+ label.row{display:flex;align-items:center;gap:6px;padding:4px 6px;font-size:12.5px;border-radius:5px;cursor:pointer}
+ label.row:hover{background:#f0f3f8}
+ label.row input{cursor:pointer}
+ label.row .dn{flex:1}
+ label.row .dv{font-size:11px;color:#6b7686}
+ .main{flex:1;display:flex;flex-direction:column;min-width:0}
+ #map{flex:1;min-height:240px;background:#dfe6ee}
+ #charts{height:270px;flex:0 0 270px;background:#fff;border-top:1px solid #dbe1ea;display:flex;gap:0;overflow:hidden}
+ .chartbox{flex:1;padding:8px 10px;overflow-x:auto;overflow-y:hidden;border-right:1px solid #eef1f5}
+ .chartbox h4{margin:2px 0 6px;font-size:13px;color:#25406e}
+ .chartbox h4 span{font-weight:600;font-size:11px;color:#6b7686}
+ .leg{display:flex;gap:12px;font-size:11px;color:#4a5566;margin-bottom:2px;flex-wrap:wrap}
+ .leg i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:3px;vertical-align:-1px}
+ .mapleg{position:absolute;z-index:500;right:10px;bottom:14px;background:rgba(255,255,255,.92);border:1px solid #cfd7e2;border-radius:8px;padding:8px 10px;font-size:11px;color:#333;line-height:1.5}
+ .mapleg b{font-size:11px}
+ .dot{display:inline-block;border-radius:50%;vertical-align:middle;margin-right:4px}
+ .leaflet-popup-content{font-size:12.5px;line-height:1.5;margin:8px 10px}
+ .pp b{font-size:13px}
+ .pp .k{color:#6b7686}
+ @media(max-width:760px){.wrap{flex-direction:column;height:auto}#side{width:100%;flex:none;max-height:200px}.main{height:auto}#map{height:340px}#charts{flex-direction:column;height:auto}.chartbox{overflow-x:auto}}
+</style>
+</head>
+<body>
+<header>
+ <h1>台北 YouBike A級場站地圖 — 配車數 × 用量（3月 vs 7月）</h1>
+ <div class="sub">點位＝A級場站（191站）。左側可分區複選；地圖僅顯示所選區的A級站，下方圖形呈現各區配車數與用量的前後變化。</div>
+</header>
+<div id="summary"></div>
+<div class="wrap">
+ <div id="side">
+  <div class="ctrl">
+   <button onclick="selAll(true)">全選</button>
+   <button onclick="selAll(false)">清除</button>
+  </div>
+  <div id="dlist"></div>
+ </div>
+ <div class="main">
+  <div style="position:relative;flex:1;display:flex">
+   <div id="map"></div>
+   <div class="mapleg">
+     <b>點：A級場站</b><br>
+     大小＝7月用量　顏色＝用量增減<br>
+     <span class="dot" style="width:12px;height:12px;background:#1F7A4D"></span>用量上升
+     <span class="dot" style="width:12px;height:12px;background:#C0392B;margin-left:6px"></span>下降
+   </div>
+  </div>
+  <div id="charts">
+   <div class="chartbox">
+     <h4>配車數 <span>（各區平均車輛：3月 → 上週）</span></h4>
+     <div class="leg"><span><i style="background:#c9b28a"></i>3月</span><span><i style="background:#8a6d3b"></i>上週</span></div>
+     <div id="chartVeh"></div>
+   </div>
+   <div class="chartbox">
+     <h4>全區總用量 <span>（平日日均借車：3月 → 7月）</span></h4>
+     <div class="leg"><span><i style="background:#9db8dd"></i>3月</span><span><i style="background:#2E5496"></i>7月</span></div>
+     <div id="chartUse"></div>
+   </div>
+  </div>
+ </div>
+</div>
+<script>
+const DATA = {"stations": [{"name": "捷運公館站(3號出口)", "city": "台北市", "dist": "大安區", "lat": 25.01551, "lng": 121.53374, "um": 766.2, "uj": 772.8, "rm": 0.8666, "rj": 0.9307}, {"name": "捷運大安站(4號出口)", "city": "台北市", "dist": "大安區", "lat": 25.0332, "lng": 121.5439, "um": 714.2, "uj": 799.8, "rm": 0.8279, "rj": 0.858}, {"name": "捷運台北101/世貿站(2號出口)", "city": "台北市", "dist": "信義區", "lat": 25.0327, "lng": 121.56157, "um": 577.5, "uj": 749.8, "rm": 0.8709, "rj": 0.9096}, {"name": "羅斯福新生南路口", "city": "台北市", "dist": "大安區", "lat": 25.01604, "lng": 121.53316, "um": 529.1, "uj": 464.6, "rm": 0.8607, "rj": 0.875}, {"name": "捷運南京復興站(7號出口)", "city": "台北市", "dist": "松山區", "lat": 25.05278, "lng": 121.54478, "um": 502.3, "uj": 584.8, "rm": 0.8907, "rj": 0.8669}, {"name": "劍潭基河路口", "city": "台北市", "dist": "士林區", "lat": 25.08403, "lng": 121.5249, "um": 476.7, "uj": 580.4, "rm": 0.8975, "rj": 0.9607}, {"name": "羅斯福路四段108巷口", "city": "台北市", "dist": "中正區", "lat": 25.01346, "lng": 121.5355, "um": 450.7, "uj": 479.6, "rm": 0.8682, "rj": 0.9674}, {"name": "捷運大安站(5號出口)", "city": "台北市", "dist": "大安區", "lat": 25.03303, "lng": 121.54372, "um": 436.5, "uj": 474.2, "rm": 0.8236, "rj": 0.9319}, {"name": "萬華火車站(D2廣場)", "city": "台北市", "dist": "萬華區", "lat": 25.03394, "lng": 121.50117, "um": 404.7, "uj": 444.2, "rm": 0.8968, "rj": 0.9287}, {"name": "捷運劍南路站(2號出口)", "city": "台北市", "dist": "中山區", "lat": 25.08475, "lng": 121.55509, "um": 390.4, "uj": 488.0, "rm": 0.897, "rj": 0.9367}, {"name": "捷運小巨蛋站(3號出口)", "city": "台北市", "dist": "松山區", "lat": 25.05152, "lng": 121.55243, "um": 384.8, "uj": 502.2, "rm": 0.8684, "rj": 0.8422}, {"name": "南港車站(市民大道)", "city": "台北市", "dist": "南港區", "lat": 25.05326, "lng": 121.60656, "um": 378.6, "uj": 471.4, "rm": 0.897, "rj": 0.8922}, {"name": "萬華區公所(大理街)", "city": "台北市", "dist": "萬華區", "lat": 25.03457, "lng": 121.5, "um": 371.0, "uj": 539.8, "rm": 0.8152, "rj": 0.8218}, {"name": "捷運台北101/世貿站(3號出口)", "city": "台北市", "dist": "信義區", "lat": 25.03275, "lng": 121.56337, "um": 366.8, "uj": 448.2, "rm": 0.8626, "rj": 0.8826}, {"name": "捷運港墘站(1號出口)", "city": "台北市", "dist": "內湖區", "lat": 25.08004, "lng": 121.57568, "um": 351.7, "uj": 448.2, "rm": 0.8725, "rj": 0.897}, {"name": "捷運文德站(2號出口)", "city": "台北市", "dist": "內湖區", "lat": 25.07842, "lng": 121.58464, "um": 338.6, "uj": 411.0, "rm": 0.8864, "rj": 0.8965}, {"name": "敦化南路二段103巷口", "city": "台北市", "dist": "大安區", "lat": 25.0287, "lng": 121.54904, "um": 335.1, "uj": 440.2, "rm": 0.8319, "rj": 0.9004}, {"name": "捷運公館站(1號出口)", "city": "台北市", "dist": "中正區", "lat": 25.01453, "lng": 121.53437, "um": 334.1, "uj": 359.4, "rm": 0.7927, "rj": 0.8378}, {"name": "捷運萬隆站(2號出口)", "city": "台北市", "dist": "文山區", "lat": 25.00144, "lng": 121.53983, "um": 333.0, "uj": 464.6, "rm": 0.8566, "rj": 0.9202}, {"name": "新生南路三段82號前", "city": "台北市", "dist": "大安區", "lat": 25.01894, "lng": 121.53361, "um": 325.6, "uj": 330.6, "rm": 0.8566, "rj": 0.9293}, {"name": "捷運南京復興站(8號出口)", "city": "台北市", "dist": "中山區", "lat": 25.05196, "lng": 121.5433, "um": 325.3, "uj": 365.6, "rm": 0.8968, "rj": 0.8535}, {"name": "捷運南京復興站(1號出口)", "city": "台北市", "dist": "中山區", "lat": 25.05253, "lng": 121.54256, "um": 322.7, "uj": 393.2, "rm": 0.8893, "rj": 0.88}, {"name": "臺大男六舍前", "city": "台北市", "dist": "大安區", "lat": 25.01664, "lng": 121.5452, "um": 320.4, "uj": 240.2, "rm": 0.8545, "rj": 0.9391}, {"name": "捷運南京三民站(3號出口)", "city": "台北市", "dist": "松山區", "lat": 25.05129, "lng": 121.56426, "um": 317.7, "uj": 392.4, "rm": 0.8972, "rj": 0.9057}, {"name": "捷運臺電大樓站(2號出口)", "city": "台北市", "dist": "大安區", "lat": 25.02021, "lng": 121.52942, "um": 305.7, "uj": 350.0, "rm": 0.8559, "rj": 0.9609}, {"name": "捷運公館站(4號出口)", "city": "台北市", "dist": "中正區", "lat": 25.01507, "lng": 121.53383, "um": 304.6, "uj": 322.8, "rm": 0.8545, "rj": 0.8982}, {"name": "復興南路二段273號前", "city": "台北市", "dist": "大安區", "lat": 25.02565, "lng": 121.54357, "um": 298.5, "uj": 322.6, "rm": 0.7989, "rj": 0.9233}, {"name": "大安運動中心", "city": "台北市", "dist": "大安區", "lat": 25.02054, "lng": 121.54561, "um": 296.7, "uj": 414.0, "rm": 0.8909, "rj": 0.9337}, {"name": "捷運小巨蛋站(5號出口)_1", "city": "台北市", "dist": "松山區", "lat": 25.05181, "lng": 121.5521, "um": 293.2, "uj": 360.6, "rm": 0.864, "rj": 0.8413}, {"name": "捷運港墘站(2號出口)", "city": "台北市", "dist": "內湖區", "lat": 25.07967, "lng": 121.57584, "um": 284.2, "uj": 300.8, "rm": 0.8542, "rj": 0.8456}, {"name": "新生南路三段94巷口", "city": "台北市", "dist": "大安區", "lat": 25.01744, "lng": 121.53334, "um": 278.8, "uj": 279.4, "rm": 0.8794, "rj": 0.9644}, {"name": "信義廣場(台北101)", "city": "台北市", "dist": "信義區", "lat": 25.03306, "lng": 121.5662, "um": 277.2, "uj": 361.0, "rm": 0.8487, "rj": 1.0}, {"name": "臨江街夜市(基隆路)", "city": "台北市", "dist": "大安區", "lat": 25.02931, "lng": 121.55721, "um": 276.3, "uj": 358.8, "rm": 0.8884, "rj": 0.935}, {"name": "基隆長興路口東側", "city": "台北市", "dist": "大安區", "lat": 25.01727, "lng": 121.54471, "um": 273.8, "uj": 264.0, "rm": 0.8229, "rj": 0.8232}, {"name": "臺大資訊大樓", "city": "台北市", "dist": "大安區", "lat": 25.02101, "lng": 121.54153, "um": 271.9, "uj": 206.6, "rm": 0.8671, "rj": 0.9444}, {"name": "臺大男七舍前", "city": "台北市", "dist": "大安區", "lat": 25.01537, "lng": 121.54698, "um": 270.9, "uj": 247.2, "rm": 0.8795, "rj": 0.9896}, {"name": "捷運臺電大樓站(2號出口)_1", "city": "台北市", "dist": "大安區", "lat": 25.02055, "lng": 121.52855, "um": 260.1, "uj": 277.4, "rm": 0.8845, "rj": 0.9059}, {"name": "捷運南京三民站(4號出口)", "city": "台北市", "dist": "松山區", "lat": 25.05152, "lng": 121.5646, "um": 256.8, "uj": 289.6, "rm": 0.7868, "rj": 0.765}, {"name": "捷運內湖站(1號出口)", "city": "台北市", "dist": "內湖區", "lat": 25.08373, "lng": 121.59406, "um": 256.0, "uj": 358.6, "rm": 0.8876, "rj": 0.9496}, {"name": "臺大社科院圖書館前", "city": "台北市", "dist": "大安區", "lat": 25.02101, "lng": 121.54284, "um": 253.6, "uj": 179.6, "rm": 0.8144, "rj": 0.9761}, {"name": "捷運象山站(1號出口)", "city": "台北市", "dist": "信義區", "lat": 25.03295, "lng": 121.56867, "um": 253.9, "uj": 280.8, "rm": 0.8562, "rj": 0.8278}, {"name": "臺科大側門(基隆路四段73巷)", "city": "台北市", "dist": "大安區", "lat": 25.01291, "lng": 121.53967, "um": 242.8, "uj": 196.4, "rm": 0.8512, "rj": 0.8661}, {"name": "萬華51號公園", "city": "台北市", "dist": "萬華區", "lat": 25.03484, "lng": 121.49928, "um": 231.3, "uj": 405.2, "rm": 0.7939, "rj": 0.8613}, {"name": "捷運台北101/世貿站(5號出口)", "city": "台北市", "dist": "信義區", "lat": 25.03338, "lng": 121.56333, "um": 225.0, "uj": 307.4, "rm": 0.8946, "rj": 0.8431}, {"name": "嘉興街175巷口", "city": "台北市", "dist": "信義區", "lat": 25.02811, "lng": 121.55671, "um": 224.0, "uj": 283.4, "rm": 0.8936, "rj": 0.9481}, {"name": "瑞湖陽光街口", "city": "台北市", "dist": "內湖區", "lat": 25.07296, "lng": 121.57603, "um": 218.3, "uj": 246.8, "rm": 0.8204, "rj": 0.7639}, {"name": "新生南路三段66號前", "city": "台北市", "dist": "大安區", "lat": 25.01976, "lng": 121.53384, "um": 217.1, "uj": 229.8, "rm": 0.8599, "rj": 0.9707}, {"name": "景行公園", "city": "台北市", "dist": "文山區", "lat": 24.99279, "lng": 121.54255, "um": 216.9, "uj": 260.6, "rm": 0.881, "rj": 0.8711}, {"name": "復興南路二段280號前", "city": "台北市", "dist": "大安區", "lat": 25.02429, "lng": 121.54328, "um": 213.7, "uj": 232.2, "rm": 0.8633, "rj": 0.9422}, {"name": "臺大動物醫院前", "city": "台北市", "dist": "大安區", "lat": 25.01576, "lng": 121.54291, "um": 208.6, "uj": 199.2, "rm": 0.8084, "rj": 0.8656}, {"name": "復源公園", "city": "台北市", "dist": "松山區", "lat": 25.04634, "lng": 121.5542, "um": 208.6, "uj": 284.0, "rm": 0.8991, "rj": 0.9078}, {"name": "中山堂", "city": "台北市", "dist": "中正區", "lat": 25.04412, "lng": 121.51025, "um": 207.9, "uj": 275.2, "rm": 0.8598, "rj": 0.9896}, {"name": "泰和公園", "city": "台北市", "dist": "信義區", "lat": 25.0193, "lng": 121.57105, "um": 204.0, "uj": 260.0, "rm": 0.873, "rj": 0.9363}, {"name": "信義松智路口(東南側)", "city": "台北市", "dist": "信義區", "lat": 25.03284, "lng": 121.56555, "um": 203.0, "uj": 230.4, "rm": 0.8825, "rj": 0.8343}, {"name": "浮洲合宜住宅(樂群路)", "city": "新北市", "dist": "板橋區", "lat": 24.99702, "lng": 121.44642, "um": 145.3, "uj": 187.8, "rm": 0.8436, "rj": 0.7935}, {"name": "雙十萬板路口", "city": "新北市", "dist": "板橋區", "lat": 25.02538, "lng": 121.47718, "um": 142.9, "uj": 180.8, "rm": 0.8424, "rj": 0.8231}, {"name": "廣福派出所", "city": "新北市", "dist": "土城區", "lat": 24.98816, "lng": 121.45655, "um": 162.8, "uj": 213.0, "rm": 0.8289, "rj": 0.8394}, {"name": "永豐公園活動中心", "city": "新北市", "dist": "板橋區", "lat": 25.02113, "lng": 121.47685, "um": 107.1, "uj": 118.8, "rm": 0.8862, "rj": 0.8939}, {"name": "文德新海路口", "city": "新北市", "dist": "板橋區", "lat": 25.02353, "lng": 121.46112, "um": 233.4, "uj": 308.8, "rm": 0.814, "rj": 0.807}, {"name": "新莊田徑場", "city": "新北市", "dist": "新莊區", "lat": 25.04341, "lng": 121.45259, "um": 207.5, "uj": 301.0, "rm": 0.8596, "rj": 0.9669}, {"name": "新莊國民運動中心(和興街)", "city": "新北市", "dist": "新莊區", "lat": 25.03891, "lng": 121.44759, "um": 138.5, "uj": 201.0, "rm": 0.8452, "rj": 0.9143}, {"name": "埔墘國小", "city": "新北市", "dist": "板橋區", "lat": 25.01908, "lng": 121.47372, "um": 119.5, "uj": 146.8, "rm": 0.8743, "rj": 0.8828}, {"name": "廣福國小", "city": "新北市", "dist": "土城區", "lat": 24.98713, "lng": 121.45506, "um": 169.2, "uj": 196.8, "rm": 0.8635, "rj": 0.8278}, {"name": "埤墘公園", "city": "新北市", "dist": "板橋區", "lat": 25.02332, "lng": 121.47422, "um": 147.1, "uj": 182.4, "rm": 0.892, "rj": 0.8548}, {"name": "重慶路89巷", "city": "新北市", "dist": "板橋區", "lat": 25.00633, "lng": 121.46206, "um": 119.1, "uj": 154.4, "rm": 0.7912, "rj": 0.8276}, {"name": "板橋重慶公園", "city": "新北市", "dist": "板橋區", "lat": 25.0001, "lng": 121.463, "um": 209.6, "uj": 247.4, "rm": 0.8923, "rj": 0.945}, {"name": "板橋四維公園", "city": "新北市", "dist": "板橋區", "lat": 25.02452, "lng": 121.46319, "um": 304.1, "uj": 409.2, "rm": 0.8862, "rj": 0.8398}, {"name": "國隆大仁街口", "city": "新北市", "dist": "三重區", "lat": 25.06468, "lng": 121.492, "um": 119.2, "uj": 155.0, "rm": 0.8785, "rj": 0.8228}, {"name": "新北高工(明德路)", "city": "新北市", "dist": "土城區", "lat": 24.98112, "lng": 121.4515, "um": 106.8, "uj": 76.6, "rm": 0.7442, "rj": 0.5396}, {"name": "林口郵局", "city": "新北市", "dist": "林口區", "lat": 25.06667, "lng": 121.36453, "um": 120.6, "uj": 172.6, "rm": 0.8616, "rj": 0.9919}, {"name": "四維公園地下停車場", "city": "新北市", "dist": "板橋區", "lat": 25.02569, "lng": 121.46392, "um": 258.1, "uj": 258.4, "rm": 0.8922, "rj": 0.9156}, {"name": "中正路145巷口", "city": "新北市", "dist": "板橋區", "lat": 25.01587, "lng": 121.4566, "um": 111.4, "uj": 150.0, "rm": 0.892, "rj": 0.8178}, {"name": "民族路225巷", "city": "新北市", "dist": "板橋區", "lat": 25.00779, "lng": 121.46995, "um": 108.6, "uj": 123.2, "rm": 0.8411, "rj": 0.8354}, {"name": "縣民觀光街口", "city": "新北市", "dist": "板橋區", "lat": 25.01702, "lng": 121.4692, "um": 109.2, "uj": 161.4, "rm": 0.7676, "rj": 0.8461}, {"name": "三重永豐公園", "city": "新北市", "dist": "三重區", "lat": 25.07463, "lng": 121.47816, "um": 139.6, "uj": 158.4, "rm": 0.8858, "rj": 0.8856}, {"name": "昌隆國小", "city": "新北市", "dist": "新莊區", "lat": 25.05213, "lng": 121.45489, "um": 193.2, "uj": 246.8, "rm": 0.8981, "rj": 0.9059}, {"name": "莊敬路25巷口", "city": "新北市", "dist": "板橋區", "lat": 25.02734, "lng": 121.47338, "um": 109.4, "uj": 154.8, "rm": 0.8665, "rj": 0.9119}, {"name": "頂溪國小", "city": "新北市", "dist": "永和區", "lat": 25.01581, "lng": 121.51126, "um": 119.6, "uj": 131.6, "rm": 0.8868, "rj": 0.8535}, {"name": "民生中山路口", "city": "新北市", "dist": "板橋區", "lat": 25.01606, "lng": 121.47346, "um": 176.8, "uj": 193.4, "rm": 0.8733, "rj": 0.875}, {"name": "中信停車場(中興街)", "city": "新北市", "dist": "永和區", "lat": 25.01228, "lng": 121.51864, "um": 135.4, "uj": 163.2, "rm": 0.8266, "rj": 0.8626}, {"name": "自強溪尾街口", "city": "新北市", "dist": "三重區", "lat": 25.07822, "lng": 121.49016, "um": 155.7, "uj": 169.4, "rm": 0.8722, "rj": 0.9043}, {"name": "萬板文聖街口", "city": "新北市", "dist": "板橋區", "lat": 25.02638, "lng": 121.47973, "um": 125.2, "uj": 172.4, "rm": 0.878, "rj": 0.9104}, {"name": "華江九華江一路口(匯翠社區)", "city": "新北市", "dist": "板橋區", "lat": 25.033, "lng": 121.466, "um": 150.4, "uj": 180.0, "rm": 0.8886, "rj": 0.9356}, {"name": "致理科技大學", "city": "新北市", "dist": "板橋區", "lat": 25.02025, "lng": 121.46271, "um": 270.7, "uj": 245.2, "rm": 0.8734, "rj": 0.7665}, {"name": "莊敬公園", "city": "新北市", "dist": "板橋區", "lat": 25.02062, "lng": 121.47025, "um": 177.1, "uj": 216.6, "rm": 0.8668, "rj": 0.8552}, {"name": "板橋和平公園", "city": "新北市", "dist": "板橋區", "lat": 24.99766, "lng": 121.46427, "um": 137.0, "uj": 135.0, "rm": 0.8838, "rj": 0.883}, {"name": "永安公園", "city": "新北市", "dist": "板橋區", "lat": 25.02418, "lng": 121.47776, "um": 114.0, "uj": 139.4, "rm": 0.8969, "rj": 0.877}, {"name": "新莊體育館", "city": "新北市", "dist": "新莊區", "lat": 25.04078, "lng": 121.45255, "um": 184.0, "uj": 249.8, "rm": 0.8243, "rj": 0.9565}, {"name": "新北市藝文中心", "city": "新北市", "dist": "板橋區", "lat": 25.0262, "lng": 121.47251, "um": 211.7, "uj": 308.8, "rm": 0.8801, "rj": 0.9061}, {"name": "忠孝二文化二路口", "city": "新北市", "dist": "林口區", "lat": 25.06913, "lng": 121.36541, "um": 120.0, "uj": 186.0, "rm": 0.8396, "rj": 0.9524}, {"name": "板橋地政事務所", "city": "新北市", "dist": "板橋區", "lat": 25.00841, "lng": 121.46333, "um": 208.0, "uj": 238.6, "rm": 0.8752, "rj": 0.8893}, {"name": "龍門公園", "city": "新北市", "dist": "三重區", "lat": 25.07482, "lng": 121.49848, "um": 122.6, "uj": 141.4, "rm": 0.8907, "rj": 0.8191}, {"name": "永和國父紀念館", "city": "新北市", "dist": "永和區", "lat": 25.00839, "lng": 121.52023, "um": 374.3, "uj": 422.8, "rm": 0.8933, "rj": 0.9102}, {"name": "碧華公園(集勇街)", "city": "新北市", "dist": "三重區", "lat": 25.08415, "lng": 121.48554, "um": 113.2, "uj": 161.6, "rm": 0.8776, "rj": 0.96}, {"name": "溪頭公園", "city": "新北市", "dist": "板橋區", "lat": 25.03312, "lng": 121.46852, "um": 105.2, "uj": 133.6, "rm": 0.8965, "rj": 0.8878}, {"name": "八德立體停車場", "city": "新北市", "dist": "新莊區", "lat": 25.02271, "lng": 121.42532, "um": 206.1, "uj": 261.6, "rm": 0.8933, "rj": 0.8838}, {"name": "板橋中山公園", "city": "新北市", "dist": "板橋區", "lat": 25.02336, "lng": 121.47109, "um": 160.4, "uj": 206.4, "rm": 0.88, "rj": 0.838}, {"name": "忠孝公園路口", "city": "新北市", "dist": "林口區", "lat": 25.0712, "lng": 121.36982, "um": 113.5, "uj": 159.6, "rm": 0.8597, "rj": 0.9254}, {"name": "中華自治街口", "city": "新北市", "dist": "新莊區", "lat": 25.04775, "lng": 121.4533, "um": 120.2, "uj": 156.8, "rm": 0.8758, "rj": 0.9148}, {"name": "興南路二段34巷口", "city": "新北市", "dist": "中和區", "lat": 24.98539, "lng": 121.50701, "um": 223.8, "uj": 237.0, "rm": 0.8986, "rj": 0.873}, {"name": "光復路一段15巷口", "city": "新北市", "dist": "三重區", "lat": 25.04751, "lng": 121.47213, "um": 131.1, "uj": 194.4, "rm": 0.8601, "rj": 0.9217}, {"name": "福和路7巷口", "city": "新北市", "dist": "永和區", "lat": 25.00854, "lng": 121.52473, "um": 106.9, "uj": 121.8, "rm": 0.8776, "rj": 0.8915}, {"name": "文德國小(公館街)", "city": "新北市", "dist": "板橋區", "lat": 25.02145, "lng": 121.45923, "um": 137.7, "uj": 159.2, "rm": 0.8927, "rj": 0.8285}, {"name": "飛駝社區(興南路)", "city": "新北市", "dist": "中和區", "lat": 24.98347, "lng": 121.50483, "um": 153.0, "uj": 158.6, "rm": 0.8936, "rj": 0.8809}, {"name": "永福橋", "city": "新北市", "dist": "永和區", "lat": 25.01003, "lng": 121.52418, "um": 164.9, "uj": 207.8, "rm": 0.8896, "rj": 0.8802}, {"name": "忠孝國中地下停車場", "city": "新北市", "dist": "板橋區", "lat": 25.00378, "lng": 121.46241, "um": 164.0, "uj": 162.2, "rm": 0.8627, "rj": 0.8826}, {"name": "國家電影及視聽文化中心", "city": "新北市", "dist": "新莊區", "lat": 25.05605, "lng": 121.44769, "um": 108.6, "uj": 131.8, "rm": 0.8861, "rj": 0.8643}, {"name": "中興中正路口(泰坤建設)", "city": "新北市", "dist": "新莊區", "lat": 25.03564, "lng": 121.44933, "um": 128.9, "uj": 168.4, "rm": 0.8934, "rj": 0.9811}, {"name": "保平路214巷", "city": "新北市", "dist": "永和區", "lat": 25.00701, "lng": 121.50921, "um": 128.2, "uj": 177.0, "rm": 0.8744, "rj": 0.9337}, {"name": "板新中山路一段口", "city": "新北市", "dist": "板橋區", "lat": 25.01491, "lng": 121.47161, "um": 197.2, "uj": 246.4, "rm": 0.8918, "rj": 0.948}, {"name": "新北市藝文中心(文化路二段124巷)", "city": "新北市", "dist": "板橋區", "lat": 25.02563, "lng": 121.4714, "um": 109.9, "uj": 137.8, "rm": 0.8615, "rj": 0.9141}, {"name": "臺北醫院", "city": "新北市", "dist": "新莊區", "lat": 25.04358, "lng": 121.45978, "um": 212.9, "uj": 243.2, "rm": 0.8863, "rj": 0.9206}, {"name": "介壽街/文化路一段188巷9弄口", "city": "新北市", "dist": "板橋區", "lat": 25.01979, "lng": 121.46856, "um": 100.6, "uj": 110.0, "rm": 0.8281, "rj": 0.7722}, {"name": "大學學成路口", "city": "新北市", "dist": "三峽區", "lat": 24.94298, "lng": 121.37521, "um": 182.7, "uj": 217.6, "rm": 0.8856, "rj": 0.9428}, {"name": "府中汽車停車場", "city": "新北市", "dist": "板橋區", "lat": 25.00745, "lng": 121.45882, "um": 133.4, "uj": 157.8, "rm": 0.8567, "rj": 0.8583}, {"name": "浮洲合宜住宅(合安一合宜路口)", "city": "新北市", "dist": "板橋區", "lat": 24.99849, "lng": 121.44863, "um": 143.3, "uj": 140.2, "rm": 0.8777, "rj": 0.7624}, {"name": "華夏科技大學(華新街)", "city": "新北市", "dist": "中和區", "lat": 24.98247, "lng": 121.50785, "um": 136.6, "uj": 121.8, "rm": 0.8783, "rj": 0.7556}, {"name": "捷運幸福站(2號出口)", "city": "新北市", "dist": "新莊區", "lat": 25.04955, "lng": 121.46028, "um": 198.0, "uj": 234.4, "rm": 0.8195, "rj": 0.9319}, {"name": "新府區運路口", "city": "新北市", "dist": "板橋區", "lat": 25.01016, "lng": 121.46546, "um": 123.1, "uj": 167.8, "rm": 0.8295, "rj": 0.8874}, {"name": "捷運輔大站(1號出口)", "city": "新北市", "dist": "新莊區", "lat": 25.03285, "lng": 121.43548, "um": 241.9, "uj": 266.0, "rm": 0.8686, "rj": 0.9426}, {"name": "金城裕民路口(中正國中)", "city": "新北市", "dist": "土城區", "lat": 24.98288, "lng": 121.45619, "um": 108.7, "uj": 107.6, "rm": 0.8684, "rj": 0.8322}, {"name": "捷運十四張站", "city": "新北市", "dist": "新店區", "lat": 24.98382, "lng": 121.52833, "um": 518.3, "uj": 625.0, "rm": 0.8638, "rj": 0.9661}, {"name": "捷運大坪林站(1號出口)", "city": "新北市", "dist": "新店區", "lat": 24.9828, "lng": 121.541, "um": 577.0, "uj": 684.6, "rm": 0.8295, "rj": 0.8541}, {"name": "健華新城社區", "city": "新北市", "dist": "板橋區", "lat": 25.01927, "lng": 121.4653, "um": 403.6, "uj": 355.2, "rm": 0.8652, "rj": 0.7865}, {"name": "民權二十張路口", "city": "新北市", "dist": "新店區", "lat": 24.98291, "lng": 121.53966, "um": 104.3, "uj": 113.4, "rm": 0.8457, "rj": 0.7926}, {"name": "捷運新北產業園區站", "city": "新北市", "dist": "新莊區", "lat": 25.06203, "lng": 121.45918, "um": 517.9, "uj": 618.8, "rm": 0.8987, "rj": 0.8872}, {"name": "捷運海山站(3號出口)", "city": "新北市", "dist": "土城區", "lat": 24.98677, "lng": 121.44935, "um": 292.6, "uj": 274.4, "rm": 0.8715, "rj": 0.7978}, {"name": "縣民民族路口", "city": "新北市", "dist": "板橋區", "lat": 25.01, "lng": 121.461, "um": 177.9, "uj": 211.2, "rm": 0.8729, "rj": 0.8628}, {"name": "板橋國小", "city": "新北市", "dist": "板橋區", "lat": 25.01035, "lng": 121.45799, "um": 137.7, "uj": 117.6, "rm": 0.8636, "rj": 0.8089}, {"name": "生態北公園", "city": "新北市", "dist": "板橋區", "lat": 24.99952, "lng": 121.45643, "um": 118.8, "uj": 147.0, "rm": 0.8822, "rj": 0.8328}, {"name": "捷運海山站(2號出口)", "city": "新北市", "dist": "土城區", "lat": 24.98457, "lng": 121.44875, "um": 310.1, "uj": 419.2, "rm": 0.8897, "rj": 0.9054}, {"name": "板橋車站(新站路)", "city": "新北市", "dist": "板橋區", "lat": 25.01529, "lng": 121.46438, "um": 268.5, "uj": 257.6, "rm": 0.8528, "rj": 0.8339}, {"name": "捷運府中站(3號出口)", "city": "新北市", "dist": "板橋區", "lat": 25.009, "lng": 121.459, "um": 586.0, "uj": 661.0, "rm": 0.8506, "rj": 0.8324}, {"name": "捷運新店區公所站(1號出口)", "city": "新北市", "dist": "新店區", "lat": 24.96737, "lng": 121.54101, "um": 257.5, "uj": 312.2, "rm": 0.8982, "rj": 0.8606}, {"name": "捷運頂溪站(中興街)", "city": "新北市", "dist": "永和區", "lat": 25.01223, "lng": 121.51526, "um": 709.0, "uj": 829.4, "rm": 0.8847, "rj": 0.8618}, {"name": "板橋車站", "city": "新北市", "dist": "板橋區", "lat": 25.01552, "lng": 121.46373, "um": 495.5, "uj": 474.0, "rm": 0.8615, "rj": 0.8713}, {"name": "亞東醫院", "city": "新北市", "dist": "板橋區", "lat": 24.99837, "lng": 121.45318, "um": 453.5, "uj": 642.6, "rm": 0.8549, "rj": 0.863}, {"name": "捷運海山站(1號出口)", "city": "新北市", "dist": "土城區", "lat": 24.98441, "lng": 121.44855, "um": 362.6, "uj": 323.6, "rm": 0.8948, "rj": 0.8952}, {"name": "新北市政府(新站路)", "city": "新北市", "dist": "板橋區", "lat": 25.01252, "lng": 121.46653, "um": 358.3, "uj": 439.8, "rm": 0.8534, "rj": 0.9104}, {"name": "捷運三和國中站(1號出口)", "city": "新北市", "dist": "三重區", "lat": 25.07588, "lng": 121.4878, "um": 357.2, "uj": 337.8, "rm": 0.8797, "rj": 0.8987}, {"name": "新北市政府(新府路)", "city": "新北市", "dist": "板橋區", "lat": 25.01245, "lng": 121.4642, "um": 348.4, "uj": 407.6, "rm": 0.8632, "rj": 0.8431}, {"name": "捷運新埔站(5號出口)", "city": "新北市", "dist": "板橋區", "lat": 25.0235, "lng": 121.46808, "um": 323.5, "uj": 352.6, "rm": 0.8779, "rj": 0.8787}, {"name": "臺鐵鳳鳴站", "city": "新北市", "dist": "鶯歌區", "lat": 24.97227, "lng": 121.33674, "um": 278.9, "uj": null, "rm": 0.8902, "rj": null}, {"name": "縣民漢生東路口(西北側)", "city": "新北市", "dist": "板橋區", "lat": 25.01531, "lng": 121.46624, "um": 237.6, "uj": 288.4, "rm": 0.8529, "rj": 0.8894}, {"name": "捷運亞東醫院站(3號出口)", "city": "新北市", "dist": "板橋區", "lat": 24.99821, "lng": 121.45258, "um": 210.1, "uj": 210.6, "rm": 0.8902, "rj": 0.812}, {"name": "板林溪北路口", "city": "新北市", "dist": "板橋區", "lat": 24.99057, "lng": 121.42636, "um": 198.0, "uj": 255.2, "rm": 0.8912, "rj": 0.95}, {"name": "捷運環狀線板橋站(5號出口)", "city": "新北市", "dist": "板橋區", "lat": 25.01598, "lng": 121.46359, "um": 170.5, "uj": 133.4, "rm": 0.7994, "rj": 0.7919}, {"name": "輕軌淡江大學站", "city": "新北市", "dist": "淡水區", "lat": 25.17653, "lng": 121.45613, "um": 115.7, "uj": 89.2, "rm": 0.8475, "rj": 0.8869}, {"name": "淡江大學(水源街)", "city": "新北市", "dist": "淡水區", "lat": 25.17457, "lng": 121.45236, "um": 101.2, "uj": 103.8, "rm": 0.8662, "rj": 0.8254}, {"name": "捷運三和國中站(2號出口)", "city": "新北市", "dist": "三重區", "lat": 25.07703, "lng": 121.48635, "um": 295.8, "uj": 341.2, "rm": 0.7505, "rj": 0.7372}, {"name": "捷運七張站(1號出口)", "city": "新北市", "dist": "新店區", "lat": 24.975, "lng": 121.54277, "um": 317.5, "uj": 360.8, "rm": 0.8077, "rj": 0.9237}, {"name": "忠誠里(北新路2段97巷)", "city": "新北市", "dist": "新店區", "lat": 24.97427, "lng": 121.54278, "um": 118.2, "uj": 158.2, "rm": 0.81, "rj": 0.8181}, {"name": "夢奇地公園(文化路一段)", "city": "新北市", "dist": "板橋區", "lat": 25.017, "lng": 121.4638, "um": 127.4, "uj": 141.4, "rm": 0.791, "rj": 0.7807}, {"name": "捷運三民高中站(2號出口)", "city": "新北市", "dist": "蘆洲區", "lat": 25.08577, "lng": 121.47374, "um": 537.3, "uj": 592.0, "rm": 0.8661, "rj": 0.8526}, {"name": "松柏街15巷口", "city": "新北市", "dist": "板橋區", "lat": 25.0296, "lng": 121.4742, "um": 116.4, "uj": 141.8, "rm": 0.8186, "rj": 0.8065}, {"name": "捷運頂溪站(復興街1巷)", "city": "新北市", "dist": "永和區", "lat": 25.0131, "lng": 121.51544, "um": 116.6, "uj": 139.0, "rm": 0.7195, "rj": 0.7146}, {"name": "捷運頂溪站(2號出口)", "city": "新北市", "dist": "永和區", "lat": 25.01424, "lng": 121.51549, "um": 332.0, "uj": 373.4, "rm": 0.7584, "rj": 0.7678}, {"name": "仁愛公園(仁愛路)", "city": "新北市", "dist": "永和區", "lat": 25.01138, "lng": 121.50796, "um": 117.5, "uj": 150.8, "rm": 0.8108, "rj": 0.8646}, {"name": "文化路一段212巷口", "city": "新北市", "dist": "板橋區", "lat": 25.02021, "lng": 121.46639, "um": 210.3, "uj": 242.0, "rm": 0.8249, "rj": 0.9198}, {"name": "板橋福德公園", "city": "新北市", "dist": "板橋區", "lat": 25.01156, "lng": 121.46734, "um": 186.4, "uj": 191.8, "rm": 0.8537, "rj": 0.9276}, {"name": "中山國中", "city": "新北市", "dist": "板橋區", "lat": 25.01856, "lng": 121.46751, "um": 204.0, "uj": 241.8, "rm": 0.8554, "rj": 0.88}, {"name": "仁愛路40巷口", "city": "新北市", "dist": "永和區", "lat": 25.01346, "lng": 121.51416, "um": 157.5, "uj": 158.2, "rm": 0.8129, "rj": 0.8281}, {"name": "江翠國小", "city": "新北市", "dist": "板橋區", "lat": 25.03236, "lng": 121.47431, "um": 136.5, "uj": 161.2, "rm": 0.8479, "rj": 0.8485}, {"name": "仁愛信義路口", "city": "新北市", "dist": "永和區", "lat": 25.01329, "lng": 121.51269, "um": 118.3, "uj": 136.8, "rm": 0.8168, "rj": 0.8385}, {"name": "石雕公園", "city": "新北市", "dist": "板橋區", "lat": 25.03026, "lng": 121.46947, "um": 131.0, "uj": 132.6, "rm": 0.8465, "rj": 0.8172}, {"name": "新北市立圖書館新店分館", "city": "新北市", "dist": "新店區", "lat": 24.98214, "lng": 121.5409, "um": 173.0, "uj": 205.0, "rm": 0.8684, "rj": 0.8524}, {"name": "正德國中", "city": "新北市", "dist": "淡水區", "lat": 25.17851, "lng": 121.44787, "um": 109.9, "uj": 122.2, "rm": 0.8979, "rj": 0.9906}, {"name": "捷運亞東醫院站(2號出口)", "city": "新北市", "dist": "板橋區", "lat": 24.99763, "lng": 121.4522, "um": 315.7, "uj": 364.2, "rm": 0.8099, "rj": 0.8322}, {"name": "林口高中", "city": "新北市", "dist": "林口區", "lat": 25.07384, "lng": 121.3803, "um": 170.4, "uj": 176.6, "rm": 0.8749, "rj": 0.977}, {"name": "捷運土城站(1號出口)", "city": "新北市", "dist": "土城區", "lat": 24.97314, "lng": 121.44418, "um": 141.6, "uj": 182.8, "rm": 0.8785, "rj": 0.8137}, {"name": "捷運新莊站(2號出口)", "city": "新北市", "dist": "新莊區", "lat": 25.03607, "lng": 121.45278, "um": 355.5, "uj": 427.8, "rm": 0.8505, "rj": 0.9219}, {"name": "捷運新埔站(1號出口)", "city": "新北市", "dist": "板橋區", "lat": 25.0235, "lng": 121.46745, "um": 697.3, "uj": 752.4, "rm": 0.8638, "rj": 0.8261}, {"name": "捷運三重國小站", "city": "新北市", "dist": "三重區", "lat": 25.07042, "lng": 121.49713, "um": 521.5, "uj": 562.4, "rm": 0.8489, "rj": 0.8591}, {"name": "捷運板橋站(1號出口)", "city": "新北市", "dist": "板橋區", "lat": 25.01335, "lng": 121.46202, "um": 455.6, "uj": 500.2, "rm": 0.8165, "rj": 0.8667}, {"name": "捷運江子翠站(3號出口)", "city": "新北市", "dist": "板橋區", "lat": 25.02933, "lng": 121.47195, "um": 399.9, "uj": 459.6, "rm": 0.835, "rj": 0.8474}, {"name": "中正民權路口", "city": "新北市", "dist": "新店區", "lat": 24.98263, "lng": 121.5336, "um": 372.3, "uj": 471.4, "rm": 0.8646, "rj": 0.9319}, {"name": "捷運新埔站(4號出口)", "city": "新北市", "dist": "板橋區", "lat": 25.02341, "lng": 121.46857, "um": 350.0, "uj": 387.8, "rm": 0.8238, "rj": 0.8256}, {"name": "捷運頭前庄站(1號出口)", "city": "新北市", "dist": "新莊區", "lat": 25.03953, "lng": 121.4608, "um": 342.4, "uj": 414.0, "rm": 0.8749, "rj": 0.8531}, {"name": "捷運新埔站(2號出口)", "city": "新北市", "dist": "板橋區", "lat": 25.02237, "lng": 121.46779, "um": 330.9, "uj": 360.4, "rm": 0.8257, "rj": 0.8294}, {"name": "捷運林口站(1號出口)", "city": "新北市", "dist": "林口區", "lat": 25.06599, "lng": 121.36251, "um": 304.8, "uj": 415.8, "rm": 0.8972, "rj": 0.9641}, {"name": "捷運板橋站(3號出口)", "city": "新北市", "dist": "板橋區", "lat": 25.01452, "lng": 121.46179, "um": 281.3, "uj": 326.8, "rm": 0.7923, "rj": 0.8063}, {"name": "捷運江子翠站(2號出口)", "city": "新北市", "dist": "板橋區", "lat": 25.02999, "lng": 121.472, "um": 220.6, "uj": 281.0, "rm": 0.8447, "rj": 0.813}, {"name": "捷運江子翠站(6號出口)", "city": "新北市", "dist": "板橋區", "lat": 25.03106, "lng": 121.47314, "um": 206.6, "uj": 284.4, "rm": 0.7916, "rj": 0.7872}, {"name": "捷運新埔站(3號出口)", "city": "新北市", "dist": "板橋區", "lat": 25.02247, "lng": 121.46868, "um": 169.9, "uj": 207.4, "rm": 0.7778, "rj": 0.7681}, {"name": "江翠國中", "city": "新北市", "dist": "板橋區", "lat": 25.02858, "lng": 121.46848, "um": 144.4, "uj": 197.6, "rm": 0.8836, "rj": 0.9517}, {"name": "板橋公車站", "city": "新北市", "dist": "板橋區", "lat": 25.01269, "lng": 121.4621, "um": 143.1, "uj": 139.4, "rm": 0.8074, "rj": 0.7943}, {"name": "捷運江子翠站(1號出口)", "city": "新北市", "dist": "板橋區", "lat": 25.03043, "lng": 121.47162, "um": 140.8, "uj": 185.0, "rm": 0.7287, "rj": 0.7265}, {"name": "捷運江子翠站(4號出口)", "city": "新北市", "dist": "板橋區", "lat": 25.02946, "lng": 121.47307, "um": 140.8, "uj": 164.2, "rm": 0.7729, "rj": 0.7756}, {"name": "文化路二段182巷1弄", "city": "新北市", "dist": "板橋區", "lat": 25.02926, "lng": 121.47241, "um": 139.9, "uj": 166.8, "rm": 0.7748, "rj": 0.8009}, {"name": "捷運江子翠站(5號出口)", "city": "新北市", "dist": "板橋區", "lat": 25.03046, "lng": 121.47291, "um": 121.8, "uj": 136.8, "rm": 0.8532, "rj": 0.8133}, {"name": "永和耕莘醫院", "city": "新北市", "dist": "永和區", "lat": 25.01123, "lng": 121.5177, "um": 179.0, "uj": 216.8, "rm": 0.7941, "rj": 0.7885}], "districts": [{"city": "台北市", "dist": "大安區", "veh_m": 2907, "veh_l": 3705, "tot_m": 54181, "tot_j": 59246, "n": 21}, {"city": "台北市", "dist": "信義區", "veh_m": 2622, "veh_l": 2951, "tot_m": 27057, "tot_j": 33730, "n": 8}, {"city": "台北市", "dist": "松山區", "veh_m": 1588, "veh_l": 1810, "tot_m": 20135, "tot_j": 25338, "n": 6}, {"city": "台北市", "dist": "士林區", "veh_m": 2042, "veh_l": 1532, "tot_m": 14868, "tot_j": 17299, "n": 1}, {"city": "台北市", "dist": "中正區", "veh_m": 1593, "veh_l": 2301, "tot_m": 24102, "tot_j": 27631, "n": 4}, {"city": "台北市", "dist": "萬華區", "veh_m": 1758, "veh_l": 1190, "tot_m": 11176, "tot_j": 13730, "n": 3}, {"city": "台北市", "dist": "中山區", "veh_m": 2329, "veh_l": 2642, "tot_m": 30620, "tot_j": 36557, "n": 3}, {"city": "台北市", "dist": "南港區", "veh_m": 1351, "veh_l": 1481, "tot_m": 10759, "tot_j": 14848, "n": 1}, {"city": "台北市", "dist": "內湖區", "veh_m": 2123, "veh_l": 2156, "tot_m": 14655, "tot_j": 19173, "n": 5}, {"city": "台北市", "dist": "文山區", "veh_m": 1522, "veh_l": 1201, "tot_m": 9150, "tot_j": 11202, "n": 2}, {"city": "新北市", "dist": "板橋區", "veh_m": 3273, "veh_l": 4801, "tot_m": 28385, "tot_j": 33638, "n": 71}, {"city": "新北市", "dist": "土城區", "veh_m": 1725, "veh_l": 1654, "tot_m": 9118, "tot_j": 10612, "n": 8}, {"city": "新北市", "dist": "新莊區", "veh_m": 2091, "veh_l": 2101, "tot_m": 15338, "tot_j": 18920, "n": 14}, {"city": "新北市", "dist": "三重區", "veh_m": 1984, "veh_l": 2045, "tot_m": 13659, "tot_j": 15762, "n": 9}, {"city": "新北市", "dist": "林口區", "veh_m": 1154, "veh_l": 988, "tot_m": 6832, "tot_j": 9189, "n": 5}, {"city": "新北市", "dist": "永和區", "veh_m": 918, "veh_l": 912, "tot_m": 7013, "tot_j": 8552, "n": 13}, {"city": "新北市", "dist": "中和區", "veh_m": 2027, "veh_l": 1994, "tot_m": 12703, "tot_j": 15260, "n": 3}, {"city": "新北市", "dist": "三峽區", "veh_m": 824, "veh_l": 852, "tot_m": 4655, "tot_j": 6048, "n": 1}, {"city": "新北市", "dist": "新店區", "veh_m": 1578, "veh_l": 1902, "tot_m": 11019, "tot_j": 13758, "n": 8}, {"city": "新北市", "dist": "鶯歌區", "veh_m": 735, "veh_l": 614, "tot_m": 1840, "tot_j": 2565, "n": 1}, {"city": "新北市", "dist": "淡水區", "veh_m": 1056, "veh_l": 778, "tot_m": 3927, "tot_j": 6147, "n": 3}, {"city": "新北市", "dist": "蘆洲區", "veh_m": 1061, "veh_l": 645, "tot_m": 5909, "tot_j": 6813, "n": 1}]};
+const key = d => d.city+'|'+d.dist;
+const state = { selected:new Set(DATA.districts.map(key)) };
+const fmt = n => (n==null?'—':Math.round(n).toLocaleString());
+const pct = (a,b)=> (a==null||b==null||b==0)?'':((a-b)/b*100);
+const pctTxt = p => p===''? '' : (p>=0?'+':'')+p.toFixed(1)+'%';
+
+// ---------- map ----------
+let map = L.map('map',{zoomControl:true}).setView([25.03,121.50],11);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(map);
+let markerLayer = L.layerGroup().addTo(map);
+
+function radius(uj){ return uj==null?4 : 3+Math.sqrt(uj)*0.62; }
+function color(s){ if(s.um==null||s.uj==null) return '#888'; const d=s.uj-s.um; if(d>2) return '#1F7A4D'; if(d<-2) return '#C0392B'; return '#C99A2E'; }
+
+function renderMap(){
+  markerLayer.clearLayers();
+  const pts=[];
+  DATA.stations.forEach(s=>{
+    if(!state.selected.has(s.city+'|'+s.dist)) return;
+    const m=L.circleMarker([s.lat,s.lng],{radius:radius(s.uj),color:'#fff',weight:1,fillColor:color(s),fillOpacity:.82});
+    const p=pct(s.uj,s.um), rp = (s.rm!=null&&s.rj!=null)?((s.rj-s.rm)*100):null;
+    m.bindPopup('<div class="pp"><b>'+s.name+'</b><br><span class="k">'+s.city+' '+s.dist+'</span><br>'+
+      '用量：'+fmt(s.um)+' → '+fmt(s.uj)+' <b class="'+(p>=0?'':'')+'" style="color:'+(p>=0?'#1F7A4D':'#C0392B')+'">'+pctTxt(p)+'</b><br>'+
+      '見車率6–24：'+(s.rm!=null?(s.rm*100).toFixed(0)+'%':'—')+' → '+(s.rj!=null?(s.rj*100).toFixed(0)+'%':'—')+(rp!=null?' ('+(rp>=0?'+':'')+rp.toFixed(1)+'pp)':'')+
+      '</div>');
+    m.addTo(markerLayer); pts.push([s.lat,s.lng]);
+  });
+  if(pts.length){ try{ map.fitBounds(pts,{padding:[30,30],maxZoom:14}); }catch(e){} }
+}
+
+// ---------- charts (SVG grouped bars) ----------
+function barChart(elId, rows, keys, colors){
+  // rows: [{label, a, b}]
+  const el=document.getElementById(elId);
+  if(!rows.length){ el.innerHTML='<div style="color:#8a94a3;font-size:12px;padding:20px">請選擇至少一個行政區</div>'; return; }
+  const gW=Math.max(34, Math.min(60, 720/rows.length)); // group width
+  const bw=gW*0.34, gap=gW*0.14;
+  const W=rows.length*gW+40, H=210, pad=24, base=H-40;
+  const max=Math.max(1,...rows.map(r=>Math.max(r.a,r.b)));
+  let s='<svg width="'+W+'" height="'+H+'" font-family="Segoe UI,Microsoft JhengHei">';
+  // gridlines
+  for(let g=0;g<=2;g++){ const y=pad+(base-pad)*g/2; const v=Math.round(max*(1-g/2)); s+='<line x1="34" y1="'+y+'" x2="'+W+'" y2="'+y+'" stroke="#eef1f5"/><text x="30" y="'+(y+3)+'" font-size="9" fill="#9aa4b2" text-anchor="end">'+v.toLocaleString()+'</text>'; }
+  rows.forEach((r,i)=>{
+    const x0=40+i*gW;
+    const ha=(base-pad)*r.a/max, hb=(base-pad)*r.b/max;
+    s+='<rect x="'+(x0)+'" y="'+(base-ha)+'" width="'+bw+'" height="'+ha+'" fill="'+colors[0]+'" rx="1.5"/>';
+    s+='<rect x="'+(x0+bw+3)+'" y="'+(base-hb)+'" width="'+bw+'" height="'+hb+'" fill="'+colors[1]+'" rx="1.5"/>';
+    const d=r.b-r.a, dp=r.a?((d/r.a)*100):0;
+    s+='<text x="'+(x0+bw+1.5)+'" y="'+(base-Math.max(ha,hb)-4)+'" font-size="9" font-weight="700" fill="'+(d>=0?'#1F7A4D':'#C0392B')+'" text-anchor="middle">'+(d>=0?'+':'')+dp.toFixed(0)+'%</text>';
+    s+='<text x="'+(x0+bw+1.5)+'" y="'+(base+12)+'" font-size="9.5" fill="#3a4453" text-anchor="middle">'+r.label+'</text>';
+  });
+  s+='</svg>';
+  el.innerHTML=s;
+}
+
+function selectedDistricts(){
+  return DATA.districts.filter(d=>state.selected.has(key(d)));
+}
+function renderCharts(){
+  let ds=selectedDistricts();
+  const v=ds.filter(d=>d.veh_m!=null).slice().sort((a,b)=>(b.veh_l-b.veh_m)-(a.veh_l-a.veh_m))
+           .map(d=>({label:d.dist.replace('區',''),a:d.veh_m,b:d.veh_l}));
+  barChart('chartVeh', v, ['3月','上週'], ['#c9b28a','#8a6d3b']);
+  const u=ds.slice().sort((a,b)=>(b.tot_j-b.tot_m)-(a.tot_j-a.tot_m))
+           .map(d=>({label:d.dist.replace('區',''),a:d.tot_m,b:d.tot_j}));
+  barChart('chartUse', u, ['3月','7月'], ['#9db8dd','#2E5496']);
+}
+
+// ---------- summary ----------
+function renderSummary(){
+  const ds=selectedDistricts();
+  let vm=0,vl=0,tm=0,tj=0,n=0,haveV=false;
+  ds.forEach(d=>{ if(d.veh_m!=null){vm+=d.veh_m;vl+=d.veh_l;haveV=true;} tm+=d.tot_m;tj+=d.tot_j;n+=d.n;});
+  const vP=vm?((vl-vm)/vm*100):0, uP=tm?((tj-tm)/tm*100):0;
+  const el=document.getElementById('summary');
+  el.innerHTML=
+   badge('選取行政區', ds.length+' 區', '共 '+n+' 個A級站')+
+   badge('配車數 3月→上週', haveV?fmt(vm)+' → '+fmt(vl):'—', haveV?arrow(vl-vm)+' '+pctTxt(vP):'')+
+   badge('全區總用量 3月→7月', fmt(tm)+' → '+fmt(tj), arrow(tj-tm)+' '+pctTxt(uP))+
+   badge('每車用量比 (7月)', haveV&&vl?(tj/vl).toFixed(1):'—', haveV?'3月 '+(vm?(tm/vm).toFixed(1):'—'):'');
+}
+function arrow(d){ return '<small class="'+(d>=0?'up':'down')+'">'+(d>=0?'▲':'▼')+'</small>'; }
+function badge(lab,val,sub){ return '<div class="badge"><div class="lab">'+lab+'</div><div class="val">'+val+' '+(sub||'')+'</div></div>'; }
+
+// ---------- sidebar ----------
+function buildSidebar(){
+  const el=document.getElementById('dlist');
+  const cities=[['台北市',''],['新北市','nt']];
+  let html='';
+  cities.forEach(([city,cls])=>{
+    const ds=DATA.districts.filter(d=>d.city===city).sort((a,b)=>(b.tot_j-b.tot_m)-(a.tot_j-a.tot_m));
+    html+='<div class="citygrp"><div class="cityhd '+cls+'" onclick="toggleCity(\''+city+'\')"><span>'+city+'（'+ds.length+'）</span><span>全選/清</span></div>';
+    ds.forEach(d=>{
+      const dv=(d.veh_m!=null)?('車'+(d.veh_l-d.veh_m>=0?'+':'')+(d.veh_l-d.veh_m)):'';
+      html+='<label class="row"><input type="checkbox" data-k="'+key(d)+'" checked onchange="onToggle(this)"><span class="dn">'+d.dist+'</span><span class="dv">'+dv+'</span></label>';
+    });
+    html+='</div>';
+  });
+  el.innerHTML=html;
+}
+function onToggle(cb){ const k=cb.getAttribute('data-k'); if(cb.checked)state.selected.add(k); else state.selected.delete(k); renderAll(); }
+function selAll(v){ document.querySelectorAll('#dlist input').forEach(cb=>{cb.checked=v; const k=cb.getAttribute('data-k'); if(v)state.selected.add(k);else state.selected.delete(k);}); renderAll(); }
+function toggleCity(city){
+  const boxes=[...document.querySelectorAll('#dlist input')].filter(cb=>cb.getAttribute('data-k').startsWith(city+'|'));
+  const anyOff=boxes.some(cb=>!cb.checked); boxes.forEach(cb=>{cb.checked=anyOff; const k=cb.getAttribute('data-k'); if(anyOff)state.selected.add(k);else state.selected.delete(k);}); renderAll();
+}
+function renderAll(){ renderSummary(); renderMap(); renderCharts(); }
+
+buildSidebar(); renderAll();
+setTimeout(()=>map.invalidateSize(),200);
+</script>
+</body></html>
