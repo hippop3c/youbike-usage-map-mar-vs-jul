@@ -19,20 +19,20 @@
  .badge .val small{font-size:12px;font-weight:600}
  .up{color:#7CE0A9}.down{color:#F5A9A0}
  .wrap{display:flex;gap:0;height:calc(100vh - 132px);min-height:520px}
- #side{width:250px;flex:0 0 250px;background:#fff;overflow-y:auto;border-right:1px solid #dbe1ea;padding:10px}
- #side h3{margin:6px 4px;font-size:13px;color:#25406e}
+ #side{width:285px;flex:0 0 285px;background:#fff;overflow-y:auto;border-right:1px solid #dbe1ea;padding:10px}
+ #side h3{margin:6px 4px;font-size:15px;color:#25406e}
  .ctrl{display:flex;gap:6px;flex-wrap:wrap;margin:6px 2px 10px}
- .ctrl button{flex:1;font-size:11px;padding:5px 4px;border:1px solid #c3ccda;background:#f4f6f9;border-radius:6px;cursor:pointer;color:#28405f}
+ .ctrl button{flex:1;font-size:13px;padding:7px 4px;border:1px solid #c3ccda;background:#f4f6f9;border-radius:6px;cursor:pointer;color:#28405f}
  .ctrl button:hover{background:#e6ebf2}
  .citygrp{margin-bottom:8px}
- .cityhd{font-size:12px;font-weight:700;color:#fff;background:#5b7bb0;padding:4px 8px;border-radius:5px;display:flex;justify-content:space-between;align-items:center;cursor:pointer}
+ .cityhd{font-size:14px;font-weight:700;color:#fff;background:#5b7bb0;padding:6px 8px;border-radius:5px;display:flex;justify-content:space-between;align-items:center;cursor:pointer}
  .cityhd.nt{background:#8a6d3b}
  .cityhd input{margin:0 6px 0 0;accent-color:#fff;vertical-align:-1px}
- label.row{display:flex;align-items:center;gap:6px;padding:4px 6px;font-size:12.5px;border-radius:5px;cursor:pointer}
+ label.row{display:flex;align-items:center;gap:7px;padding:5px 6px;font-size:14.5px;border-radius:5px;cursor:pointer}
  label.row:hover{background:#f0f3f8}
  label.row input{cursor:pointer}
  label.row .dn{flex:1}
- label.row .dv{font-size:11px;color:#6b7686}
+ label.row .dv{font-size:12.5px;color:#6b7686}
  .main{flex:1;display:flex;flex-direction:column;min-width:0}
  #map{flex:1;min-height:240px;background:#dfe6ee}
  #charts{height:270px;flex:0 0 270px;background:#fff;border-top:1px solid #dbe1ea;display:flex;gap:0;overflow:hidden}
@@ -184,7 +184,7 @@ function buildSidebar(){
     html+='<div class="citygrp"><label class="cityhd '+cls+'"><span><input type="checkbox" class="city-toggle" data-city="'+city+'" checked onchange="onCityToggle(this)">'+city+'（'+ds.length+'）</span><span>整市勾選</span></label>';
     ds.forEach(d=>{
       const dv=(d.veh_m!=null)?('車'+(d.veh_l-d.veh_m>=0?'+':'')+(d.veh_l-d.veh_m)):'';
-      html+='<label class="row"><input type="checkbox" data-k="'+key(d)+'" checked onchange="onToggle(this)"><span class="dn">'+d.dist+'</span><span class="dv">'+dv+'</span></label>';
+      html+='<label class="row"><input type="checkbox" data-k="'+key(d)+'" checked onchange="onToggle(this)"><span class="dn">'+d.dist+'（'+d.n+'）</span><span class="dv">'+dv+'</span></label>';
     });
     html+='</div>';
   });
